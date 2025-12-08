@@ -41,6 +41,9 @@ android {
     }
 }
 
+// Strong skipping is enabled by default (Kotlin 2.0.20+)
+// We use @DontMemoize annotation to demonstrate unstable lambda behavior
+
 dependencies {
     // Core Android
     implementation(libs.androidx.core.ktx)

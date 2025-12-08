@@ -2,22 +2,24 @@ package com.example.patterns.exercises.ex03_antipatterns.ap03_unstable_lambda
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,59 +33,35 @@ import com.example.patterns.ui.theme.GoodColor
 // 1. Use remember {} to cache the lambda
 // 2. Use a method reference (viewModel::onEvent)
 // 3. Move the handler to a ViewModel (stable reference)
-// 4. Use @Stable annotation for custom types
+// 4. Strong Skipping Mode (Kotlin 2.0.20+) - auto-memoizes lambdas
 //
 // The goal is to ensure the lambda reference doesn't change
 // unless the behavior actually changes.
 // ============================================================================
 
 /**
- * A stable handler class that can be remembered
- */
-class TodoHandler(
-    private val onItemsChange: (List<TodoItem>) -> Unit
-) {
-    fun toggle(id: Int, items: List<TodoItem>) {
-        val newItems = items.map {
-            if (it.id == id) it.copy(isCompleted = !it.isCompleted)
-            else it
-        }
-        onItemsChange(newItems)
-    }
-}
-
-/**
- * FIXED: Uses remembered lambda and stable references
+ * FIXED: Uses remembered lambda - same instance each recomposition
+ *
+ * When you tap an item:
+ * 1. selectedItem changes → Parent recomposes
+ * 2. But onClick lambda is REMEMBERED - same instance!
+ * 3. Compose sees same lambda reference → skips recomposition
+ * 4. Only the tapped item recomposes (because isSelected changed)
  */
 @Composable
 fun UnstableLambdaFixed(
     modifier: Modifier = Modifier
 ) {
-    var counter by remember { mutableIntStateOf(0) }
-    var items by remember {
-        mutableStateOf(
-            listOf(
-                TodoItem(1, "Learn Compose"),
-                TodoItem(2, "Understand State"),
-                TodoItem(3, "Master Recomposition"),
-                TodoItem(4, "Avoid Anti-patterns"),
-                TodoItem(5, "Build Great Apps")
-            )
-        )
+    val items = remember {
+        (1..50).map { ListItem(it, "Item $it") }
     }
+    var selectedItem by remember { mutableStateOf<ListItem?>(null) }
 
-    // FIX 1: Remember a handler object
-    val handler = remember {
-        TodoHandler { newItems -> items = newItems }
-    }
-
-    // FIX 2: Remember the toggle function with correct dependencies
-    val onToggle = remember<(Int) -> Unit> {
-        { id ->
-            items = items.map {
-                if (it.id == id) it.copy(isCompleted = !it.isCompleted)
-                else it
-            }
+    // FIX: Remember the lambda with a callback that takes the item
+    // This creates ONE stable function that can handle any item
+    val onItemClick: (ListItem) -> Unit = remember {
+        { item: ListItem ->
+            selectedItem = item
         }
     }
 
@@ -92,7 +70,6 @@ fun UnstableLambdaFixed(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-
         Text(
             text = "Stable Lambda References",
             style = MaterialTheme.typography.titleLarge,
@@ -100,30 +77,87 @@ fun UnstableLambdaFixed(
             color = GoodColor
         )
 
-        Text(
-            text = "Counter: $counter",
-            style = MaterialTheme.typography.titleMedium
-        )
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Button(onClick = { counter++ }) {
-            Text("Increment Counter")
+        // Instructions
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = GoodColor.copy(alpha = 0.15f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Try This",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GoodColor
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "1. Tap any item to select it\n" +
+                        "2. Only the selected item's count increases!\n\n" +
+                        "The lambda is remembered - same instance each time.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "What is Memoization?",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Memoization = caching a value so it's not recreated.\n\n" +
+                                "Without remember:\n" +
+                                "  onClick = { select(item) } → NEW lambda each time\n\n" +
+                                "With remember:\n" +
+                                "  val onClick = remember { { select(item) } } → SAME instance\n\n" +
+                                "Strong Skipping Mode (Kotlin 2.0.20+) auto-wraps lambdas in remember!",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
         }
 
-        Text(
-            text = "Watch: Items DON'T recompose when counter changes!",
-            style = MaterialTheme.typography.labelSmall,
-            color = GoodColor
-        )
+        Spacer(modifier = Modifier.height(8.dp))
 
+        // Selected item display
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = GoodColor.copy(alpha = 0.1f)
+            )
+        ) {
+            Text(
+                text = "Selected: ${selectedItem?.text ?: "None"}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(12.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // List of items
         LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.weight(1f)
         ) {
             items(items, key = { it.id }) { item ->
-                // GOOD: Using remembered lambda - same reference each time
-                TodoItemCardFixed(
+                // GOOD: Pass the remembered lambda with the item
+                // Same function reference, just different argument
+                ItemCardFixed(
                     item = item,
-                    onToggle = onToggle
+                    isSelected = selectedItem?.id == item.id,
+                    onClick = { onItemClick(item) }
                 )
             }
         }
@@ -131,56 +165,56 @@ fun UnstableLambdaFixed(
 }
 
 /**
- * Child composable - now only recomposes when its data changes
+ * Child composable - only recomposes when its parameters actually change
  */
 @Composable
-private fun TodoItemCardFixed(
-    item: TodoItem,
-    onToggle: (Int) -> Unit,
+private fun ItemCardFixed(
+    item: ListItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Track recompositions
+    val recomposeCounter = remember { intArrayOf(0) }
+    recomposeCounter[0]++
+    val currentCount = recomposeCounter[0]
+
     Card(
-        onClick = { onToggle(item.id) },
+        onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (item.isCompleted) {
-                MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isSelected) {
+                GoodColor.copy(alpha = 0.3f)
             } else {
                 MaterialTheme.colorScheme.surface
             }
         )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
                 text = item.text,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (item.isCompleted) FontWeight.Light else FontWeight.Normal
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             )
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = GoodColor.copy(alpha = 0.2f)
+                )
+            ) {
+                Text(
+                    text = "recomposed: $currentCount",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = GoodColor,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
         }
     }
 }
-
-/**
- * Even better: Using ViewModel approach (recommended for production)
- *
- * When using a ViewModel:
- * - Methods are stable references by default
- * - viewModel::onToggle creates a stable reference
- * - No need for manual remember
- *
- * Example:
- * ```
- * class TodoViewModel : ViewModel() {
- *     var items by mutableStateOf<List<TodoItem>>(emptyList())
- *         private set
- *
- *     fun onToggle(id: Int) {
- *         items = items.map { ... }
- *     }
- * }
- *
- * // In Composable:
- * TodoItemCard(item, viewModel::onToggle) // Stable reference!
- * ```
- */
