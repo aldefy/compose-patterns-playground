@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -28,28 +29,40 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.patterns.ui.theme.GoodColor
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
 
 // ============================================================================
-// FIX: Reset the flag AFTER all critical work is done
+// FIX: Use snapshotFlow to observe state changes WITHOUT self-cancellation
 // ============================================================================
 //
-// THE SOLUTION:
-// Move the flag reset to AFTER the suspension point and critical work.
-// Or better: reset it elsewhere (on error, on clear, etc.) - not inside the effect.
+// THE PROPER SOLUTION:
+// Use snapshotFlow { state } inside LaunchedEffect(Unit).
+// snapshotFlow converts Compose state reads into a Flow.
+// When the state changes, it emits - but does NOT cancel the coroutine!
 //
 // Pattern:
-//   LaunchedEffect(wasAutoFilled) {
-//       if (!wasAutoFilled) return
-//
-//       delay(300)           // Suspension - completes!
-//       onVerifyOTP(otp)     // Critical work - executes!
-//       wasAutoFilled = false // Reset AFTER (or don't reset here at all)
+//   LaunchedEffect(Unit) {
+//       snapshotFlow { wasAutoFilled }
+//           .filter { it }
+//           .collect {
+//               wasAutoFilled = false  // Safe! Doesn't cancel this coroutine
+//               delay(300)             // Completes!
+//               onVerifyOTP(otp)       // Executes!
+//           }
 //   }
+//
+// WHY THIS WORKS:
+// - LaunchedEffect(Unit) never restarts (key never changes)
+// - snapshotFlow observes state reactively
+// - Changing wasAutoFilled just emits a new value, doesn't cancel collect
 //
 // ============================================================================
 
 /**
- * FIXED: Reset the flag AFTER suspension and critical work
+ * FIXED: Use snapshotFlow to avoid self-cancellation
+ *
+ * snapshotFlow converts Compose state into a Flow that doesn't
+ * cancel when the observed value changes.
  */
 @Composable
 fun LaunchedEffectTrapFixed(
@@ -58,6 +71,24 @@ fun LaunchedEffectTrapFixed(
     var wasAutoFilled by remember { mutableStateOf(false) }
     var isVerifying by remember { mutableStateOf(false) }
     var verificationResult by remember { mutableStateOf<String?>(null) }
+
+    // FIX: Use snapshotFlow inside LaunchedEffect(Unit)
+    LaunchedEffect(Unit) {
+        snapshotFlow { wasAutoFilled }
+            .filter { it }  // Only proceed when true
+            .collect {
+                // Safe to reset immediately - this is a Flow, not a keyed effect!
+                wasAutoFilled = false
+
+                // Small delay to feel natural - COMPLETES!
+                delay(300)
+
+                // CRITICAL WORK - NOW IT EXECUTES!
+                Log.d("OTP", "Calling onVerifyOTP - this prints!")
+                verificationResult = "Success! OTP Verified"
+                isVerifying = false
+            }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -68,7 +99,7 @@ fun LaunchedEffectTrapFixed(
     ) {
         item {
             Text(
-                text = "LaunchedEffect Fixed",
+                text = "snapshotFlow Fixed",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = GoodColor
@@ -151,24 +182,6 @@ fun LaunchedEffectTrapFixed(
             }
         }
 
-        // FIX: Reset the flag AFTER delay and critical work
-        item {
-            LaunchedEffect(wasAutoFilled) {
-                if (!wasAutoFilled) return@LaunchedEffect
-
-                // Small delay to feel natural - COMPLETES!
-                delay(300)
-
-                // CRITICAL WORK - NOW IT EXECUTES!
-                Log.d("OTP", "Calling onVerifyOTP - this prints!")
-                verificationResult = "Success! OTP Verified"
-                isVerifying = false
-
-                // FIX: Reset AFTER critical work (or reset elsewhere)
-                wasAutoFilled = false
-            }
-        }
-
         // Fix Explanation
         item {
             Card(
@@ -181,7 +194,7 @@ fun LaunchedEffectTrapFixed(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "✓ Why does this work?",
+                        text = "✓ Why snapshotFlow works",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = GoodColor
@@ -191,14 +204,15 @@ fun LaunchedEffectTrapFixed(
 
                     Text(
                         text = """
-1. SMS arrives: wasAutoFilled = true
-2. LaunchedEffect(wasAutoFilled) starts
-3. delay(300) completes normally
-4. onVerifyOTP() EXECUTES!
-5. isVerifying = false (spinner stops)
-6. wasAutoFilled = false (reset AFTER work done)
+1. LaunchedEffect(Unit) starts ONCE
+2. snapshotFlow observes wasAutoFilled
+3. When wasAutoFilled = true, flow emits
+4. wasAutoFilled = false (just emits again, no cancellation!)
+5. delay(300) completes normally
+6. onVerifyOTP() EXECUTES!
 
-The key doesn't change until AFTER all critical work is complete.
+The coroutine never restarts because the key is Unit.
+snapshotFlow just observes - it doesn't control lifecycle.
                         """.trimIndent(),
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -228,17 +242,16 @@ The key doesn't change until AFTER all critical work is complete.
 
                     Text(
                         text = """
-LaunchedEffect(wasAutoFilled) {
-    if (!wasAutoFilled) return
+LaunchedEffect(Unit) {  // Key is Unit - never restarts!
+    snapshotFlow { wasAutoFilled }
+        .filter { it }
+        .collect {
+            // Safe! This is a Flow, not a keyed effect
+            wasAutoFilled = false
 
-    delay(300)  // ← COMPLETES!
-
-    // NOW IT EXECUTES!
-    onVerifyOTP(otp)
-    isVerifying = false
-
-    // Reset AFTER work done
-    wasAutoFilled = false  // ← Safe here!
+            delay(300)        // ← COMPLETES!
+            onVerifyOTP(otp)  // ← EXECUTES!
+        }
 }
                         """.trimIndent(),
                         style = MaterialTheme.typography.bodySmall,
@@ -248,7 +261,7 @@ LaunchedEffect(wasAutoFilled) {
             }
         }
 
-        // Rule of thumb
+        // Key insight
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -260,7 +273,7 @@ LaunchedEffect(wasAutoFilled) {
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "Rule of Thumb",
+                        text = "Key Insight",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -268,9 +281,61 @@ LaunchedEffect(wasAutoFilled) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Never change the LaunchedEffect key BEFORE a suspension point.\n\nReset flags AFTER critical work, or reset them elsewhere (on error, on clear, etc.)",
+                        text = """
+LaunchedEffect(key) restarts when key changes.
+
+snapshotFlow { state } inside LaunchedEffect(Unit) observes state changes WITHOUT restarting the coroutine.
+
+Use snapshotFlow when you need to:
+• React to state changes
+• But NOT cancel ongoing work
+                        """.trimIndent(),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Comparison
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Broken vs Fixed",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = """
+// 💀 BROKEN - key change cancels effect
+LaunchedEffect(wasAutoFilled) {
+    wasAutoFilled = false  // CANCELS!
+    delay(300)             // Never runs
+}
+
+// ✅ FIXED - snapshotFlow observes safely
+LaunchedEffect(Unit) {
+    snapshotFlow { wasAutoFilled }
+        .filter { it }
+        .collect {
+            wasAutoFilled = false  // Just emits
+            delay(300)             // Runs!
+        }
+}
+                        """.trimIndent(),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
                     )
                 }
             }
