@@ -119,20 +119,18 @@ Build a complete state machine with:
 
 12 common mistakes and their fixes:
 
-| # | Anti-pattern | Problem |
-|---|-------------|---------|
-| 01 | LaunchedEffect Trap | Changing key inside effect cancels it |
-| 02 | derivedStateOf Misuse | Using when not needed, missing when needed |
-| 03 | Unstable Lambda | Lambdas causing recomposition |
-| 04 | State in Loop | remember without key in iterations |
-| 05 | Side Effects in Composition | Effects during composition |
-| 06 | Flow Collection | Wrong way to collect flows |
-| 07 | State Read Too High | Excess recomposition scope |
-| 08 | Wrong remember Keys | Missing or incorrect keys |
-| 09 | Shared State Mutation | Mutating collections without trigger |
-| 10 | Events vs State | Using state for one-time events |
-| 11 | Fake ViewModel | Creating state holders in composables |
-| 12 | Effects in Transitions | Executing effects during transitions |
+1. **LaunchedEffect Trap** - Changing key inside effect cancels it
+2. **derivedStateOf Misuse** - Using when not needed, missing when needed
+3. **Unstable Lambda** - Lambdas causing recomposition
+4. **State in Loop** - remember without key in iterations
+5. **Side Effects in Composition** - Effects during composition
+6. **Flow Collection** - Wrong way to collect flows
+7. **State Read Too High** - Excess recomposition scope
+8. **Wrong remember Keys** - Missing or incorrect keys
+9. **Shared State Mutation** - Mutating collections without trigger
+10. **Events vs State** - Using state for one-time events
+11. **Fake ViewModel** - Creating state holders in composables
+12. **Effects in Transitions** - Executing effects during transitions
 
 ### Exercise 04: Effect Coordinator
 
