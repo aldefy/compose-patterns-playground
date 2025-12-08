@@ -76,19 +76,19 @@ app/src/main/java/com/example/patterns/
 ├── exercises/
 │   ├── ex01_boolean_explosion/   # Boolean flags vs sealed interfaces
 │   ├── ex02_state_machine/       # Complete state machine pattern
-│   ├── ex03_antipatterns/        # 12 common pitfalls
-│   │   ├── ap01_launched_effect_trap/
-│   │   ├── ap02_derived_state_misuse/
-│   │   ├── ap03_unstable_lambda/
-│   │   ├── ap04_state_in_loop/
-│   │   ├── ap05_side_effect_in_composition/
-│   │   ├── ap06_flow_collect_wrong/
-│   │   ├── ap07_state_read_too_high/
-│   │   ├── ap08_remember_wrong_keys/
-│   │   ├── ap09_shared_state_mutation/
-│   │   ├── ap10_event_vs_state/
-│   │   ├── ap11_viewmodel_in_composable/
-│   │   └── ap12_effects_in_transition/
+│   ├── ex03_antipatterns/        # 12 common pitfalls (Broken/Fixed demos)
+│   │   ├── ap01_launched_effect_trap/      # Changing key cancels effect
+│   │   ├── ap02_derived_state_misuse/      # When to use derivedStateOf
+│   │   ├── ap03_unstable_lambda/           # Lambda stability
+│   │   ├── ap04_state_in_loop/             # State mutation in loops
+│   │   ├── ap05_side_effect_in_composition/# Effects during composition
+│   │   ├── ap06_flow_collect_wrong/        # Proper Flow collection
+│   │   ├── ap07_state_read_too_high/       # Recomposition scope
+│   │   ├── ap08_remember_wrong_keys/       # remember key mistakes
+│   │   ├── ap09_shared_state_mutation/     # Mutable state sharing
+│   │   ├── ap10_event_vs_state/            # Events vs UI state
+│   │   ├── ap11_viewmodel_in_composable/   # ViewModel scoping
+│   │   └── ap12_effects_in_transition/     # Pure transitions
 │   ├── ex04_effect_coordinator/  # Centralized effect handling
 │   └── ex05_testing/             # Testing pure state machines
 ├── navigation/
@@ -117,20 +117,9 @@ Build a complete state machine with:
 
 ### Exercise 03: Anti-patterns
 
-12 common mistakes and their fixes:
+Explore 12 common Compose mistakes with interactive Broken/Fixed demos. Each anti-pattern shows the bug in action and demonstrates the correct approach.
 
-1. **LaunchedEffect Trap** - Changing key inside effect cancels it
-2. **derivedStateOf Misuse** - Using when not needed, missing when needed
-3. **Unstable Lambda** - Lambdas causing recomposition
-4. **State in Loop** - remember without key in iterations
-5. **Side Effects in Composition** - Effects during composition
-6. **Flow Collection** - Wrong way to collect flows
-7. **State Read Too High** - Excess recomposition scope
-8. **Wrong remember Keys** - Missing or incorrect keys
-9. **Shared State Mutation** - Mutating collections without trigger
-10. **Events vs State** - Using state for one-time events
-11. **Fake ViewModel** - Creating state holders in composables
-12. **Effects in Transitions** - Executing effects during transitions
+**Key Takeaway**: Understanding what NOT to do is as important as knowing the right patterns.
 
 ### Exercise 04: Effect Coordinator
 
