@@ -8,7 +8,7 @@ A workshop project for **"Compose Beyond the UI: Architecting Reactive State Mac
 
 ## Slides
 
-📑 [Download Workshop Slides (PDF)](docs/slides.pdf)
+[![SpeakerDeck](https://img.shields.io/badge/View_Slides-SpeakerDeck-009287?style=for-the-badge&logo=speakerdeck)](https://speakerdeck.com/aldefy/compose-beyond-the-ui-architecting-reactive-state-machines-at-scale) [![PDF](https://img.shields.io/badge/Download-PDF-red?style=for-the-badge&logo=adobe)](docs/slides.pdf)
 
 ## Overview
 
