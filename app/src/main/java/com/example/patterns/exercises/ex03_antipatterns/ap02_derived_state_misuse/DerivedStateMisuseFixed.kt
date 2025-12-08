@@ -3,14 +3,12 @@ package com.example.patterns.exercises.ex03_antipatterns.ap02_derived_state_misu
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -19,7 +17,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,8 +54,8 @@ import com.example.patterns.ui.theme.GoodColor
 /**
  * FIXED: Use derivedStateOf for expensive filtering
  *
- * derivedStateOf prevents recalculation when unrelated state changes.
- * The filter only runs when items or searchQuery actually change!
+ * Type in the "Notes" field - filter count stays the same!
+ * derivedStateOf only recalculates when items or searchQuery change.
  */
 @Composable
 fun DerivedStateMisuseFixed(
@@ -68,14 +65,20 @@ fun DerivedStateMisuseFixed(
         mutableStateOf(List(100) { "Item $it" })
     }
     var searchQuery by remember { mutableStateOf("") }
-    var unrelatedCounter by remember { mutableIntStateOf(0) }
-    var filterCallCount by remember { mutableIntStateOf(0) }
+    var notes by remember { mutableStateOf("") }  // Unrelated field
 
-    // GOOD: derivedStateOf prevents recalculation when unrelatedCounter changes!
+    // Track recomposition count (non-state holder to avoid infinite loops)
+    val recomposeCount = remember { object { var count = 0 } }
+    recomposeCount.count++
+
+    // Track filter calls (non-state holder)
+    val filterCallCount = remember { object { var count = 0 } }
+
+    // GOOD: derivedStateOf prevents recalculation when notes changes!
     val filteredItems by remember {
         derivedStateOf {
-            filterCallCount++
-            Log.d("DerivedState", "Filter called! Count: $filterCallCount")
+            filterCallCount.count++
+            Log.d("DerivedState", "Filter called! Count: ${filterCallCount.count}")
             items.filter { it.contains(searchQuery, ignoreCase = true) }
         }
     }
@@ -108,18 +111,34 @@ fun DerivedStateMisuseFixed(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "List Filter Demo",
+                        text = "Shopping List with Notes",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
 
                     val focusManager = LocalFocusManager.current
+
+                    // Search field
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         label = { Text("Search items") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.clearFocus() }
+                        )
+                    )
+
+                    // Unrelated notes field - typing here should NOT re-filter!
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text("Notes (type here - filter won't run!)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 3,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(
                             onDone = { focusManager.clearFocus() }
@@ -141,48 +160,22 @@ fun DerivedStateMisuseFixed(
                             modifier = Modifier.padding(12.dp)
                         ) {
                             Text(
-                                text = "Filter called: $filterCallCount times",
+                                text = "Recompositions: ${recomposeCount.count}",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = GoodColor
                             )
                             Text(
-                                text = "Unrelated counter: $unrelatedCounter",
+                                text = "Filter calls: ${filterCallCount.count}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = GoodColor
+                            )
+                            Text(
+                                text = "Notes length: ${notes.length} chars",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
-                    }
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                // This SHOULD trigger filter (items changed)
-                                items = items + "New Item ${items.size}"
-                            }
-                        ) {
-                            Text("Add Item")
-                        }
-
-                        Button(
-                            onClick = {
-                                // This should NOT re-filter - and it doesn't!
-                                unrelatedCounter++
-                            }
-                        ) {
-                            Text("Trigger Recomposition")
-                        }
-                    }
-
-                    Button(
-                        onClick = {
-                            filterCallCount = 0
-                            unrelatedCounter = 0
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Reset Counters")
                     }
                 }
             }
@@ -210,15 +203,15 @@ fun DerivedStateMisuseFixed(
 
                     Text(
                         text = """
-Click "Trigger Recomposition" multiple times.
+Type anything in the "Notes" field.
 
-The filter count stays the same!
+Watch the recomposition count increase, but filter calls stay the same!
 
 derivedStateOf only recalculates when:
-- items changes (Add Item)
-- searchQuery changes (typing)
+• items changes (if you were to add items)
+• searchQuery changes (typing in search)
 
-NOT on unrelated recompositions!
+NOT when notes changes - that's the fix!
                         """.trimIndent(),
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -257,9 +250,10 @@ val filteredItems by remember {
     }
 }
 
-// Unrelated state changes don't trigger filter
-var unrelatedCounter by remember { ... }
-unrelatedCounter++ // <- NO filter call!
+// Typing in notes causes recomposition
+var notes by remember { mutableStateOf("") }
+notes = "a"  // Recomposition, but NO filter call!
+notes = "ab" // Recomposition, but NO filter call!
                         """.trimIndent(),
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace
