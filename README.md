@@ -6,6 +6,10 @@ A workshop project for **"Compose Beyond the UI: Architecting Reactive State Mac
 
 **Droidcon India 2025** | Adit Lal (GDE Android)
 
+## Slides
+
+📑 [Download Workshop Slides (PDF)](docs/slides.pdf)
+
 ## Overview
 
 This project demonstrates patterns for building predictable, testable, and scalable UI state in Jetpack Compose. Through hands-on exercises, you'll learn to avoid common anti-patterns and build robust state machines.
@@ -69,32 +73,53 @@ sealed interface Effect {
 ## Project Structure
 
 ```
-app/src/main/java/com/example/patterns/
-├── core/
-│   ├── effects/          # Effect types and handler
-│   └── state/            # TransitionResult, Async
-├── exercises/
-│   ├── ex01_boolean_explosion/   # Boolean flags vs sealed interfaces
-│   ├── ex02_state_machine/       # Complete state machine pattern
-│   ├── ex03_antipatterns/        # 12 common pitfalls (Broken/Fixed demos)
-│   │   ├── ap01_launched_effect_trap/      # Changing key cancels effect
-│   │   ├── ap02_derived_state_misuse/      # When to use derivedStateOf
-│   │   ├── ap03_unstable_lambda/           # Lambda stability
-│   │   ├── ap04_state_in_loop/             # State mutation in loops
-│   │   ├── ap05_side_effect_in_composition/# Effects during composition
-│   │   ├── ap06_flow_collect_wrong/        # Proper Flow collection
-│   │   ├── ap07_state_read_too_high/       # Recomposition scope
-│   │   ├── ap08_remember_wrong_keys/       # remember key mistakes
-│   │   ├── ap09_shared_state_mutation/     # Mutable state sharing
-│   │   ├── ap10_event_vs_state/            # Events vs UI state
-│   │   ├── ap11_viewmodel_in_composable/   # ViewModel scoping
-│   │   └── ap12_effects_in_transition/     # Pure transitions
-│   ├── ex04_effect_coordinator/  # Centralized effect handling
-│   └── ex05_testing/             # Testing pure state machines
-├── navigation/
-└── ui/
-    ├── components/       # Reusable UI components
-    └── theme/            # Material 3 theming
+compose-patterns-playground/
+├── README.md                           # Workshop guide
+├── docs/
+│   └── slides.pdf                      # Workshop slides (100 pages)
+├── app/
+│   └── src/
+│       ├── main/java/com/example/patterns/
+│       │   ├── MainActivity.kt         # Navigation hub to all exercises
+│       │   ├── core/
+│       │   │   ├── state/              # TransitionResult, Async
+│       │   │   └── effects/            # Effect types and handler
+│       │   ├── exercises/
+│       │   │   ├── ex01_boolean_explosion/
+│       │   │   │   ├── BooleanExplosionBad.kt
+│       │   │   │   ├── BooleanExplosionGood.kt
+│       │   │   │   └── BooleanExplosionExercise.kt
+│       │   │   ├── ex02_state_machine/
+│       │   │   │   ├── ProfileStateMachine.kt
+│       │   │   │   ├── ProfileViewModel.kt
+│       │   │   │   ├── ProfileScreen.kt
+│       │   │   │   └── StateMachineExercise.kt
+│       │   │   ├── ex03_antipatterns/
+│       │   │   │   ├── ap01_launched_effect_trap/
+│       │   │   │   │   ├── LaunchedEffectTrapBroken.kt
+│       │   │   │   │   └── LaunchedEffectTrapFixed.kt
+│       │   │   │   ├── ap02_derived_state_misuse/
+│       │   │   │   ├── ap03_unstable_lambda/
+│       │   │   │   ├── ap04_state_in_loop/
+│       │   │   │   ├── ap05_side_effect_in_composition/
+│       │   │   │   ├── ap06_flow_collect_wrong/
+│       │   │   │   ├── ap07_state_read_too_high/
+│       │   │   │   ├── ap08_remember_wrong_keys/
+│       │   │   │   ├── ap09_shared_state_mutation/
+│       │   │   │   ├── ap10_event_vs_state/
+│       │   │   │   ├── ap11_viewmodel_in_composable/
+│       │   │   │   └── ap12_effects_in_transition/
+│       │   │   ├── ex04_effect_coordinator/
+│       │   │   └── ex05_testing/
+│       │   ├── navigation/
+│       │   └── ui/
+│       │       ├── components/         # RecompositionCounter, CodeToggle
+│       │       └── theme/              # Material 3 theming
+│       └── test/java/com/example/patterns/
+│           └── exercises/ex02_state_machine/
+│               └── ProfileStateMachineTest.kt
+├── gradle/
+└── build.gradle.kts
 ```
 
 ## Exercises
