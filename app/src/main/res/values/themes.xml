@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ComposePatternsPlayground" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.ComposePatternsPlayground" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Splash screen background color -->
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+
+    <!-- Light mode splash background -->
+    <color name="splash_background">#FFFFFFFF</color>
 </resources>

@@ -3,12 +3,14 @@ package com.example.patterns.exercises.ex03_antipatterns.ap02_derived_state_misu
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -24,12 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.platform.LocalFocusManager
 import com.example.patterns.ui.theme.BadColor
 
 // ============================================================================
@@ -54,30 +51,33 @@ import com.example.patterns.ui.theme.BadColor
 /**
  * BROKEN: Missing derivedStateOf for expensive filtering
  *
- * Type in the "Notes" field and watch the filter count increase!
- * The filter runs on every keystroke even though the search didn't change.
+ * Tap the quantity buttons and watch the filter count increase!
+ * The filter runs on every tap even though the search didn't change.
  */
 @Composable
 fun DerivedStateMisuseBroken(
     modifier: Modifier = Modifier
 ) {
-    var items by remember {
-        mutableStateOf(List(100) { "Item $it" })
+    // Grocery items to filter
+    val items = remember {
+        listOf("Apple", "Banana", "Orange", "Milk", "Bread", "Eggs", "Cheese", "Butter", "Yogurt", "Chicken")
     }
     var searchQuery by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }  // Unrelated field
 
-    // Track recomposition count (this increments on every recomposition)
-    val recomposeCount = remember { object { var count = 0 } }
-    recomposeCount.count++
+    // Quantity selector - changing this should NOT re-filter!
+    var quantity by remember { mutableIntStateOf(1) }
+
+    // Track filter calls - use state so UI updates
+    var filterCallCount by remember { mutableIntStateOf(0) }
 
     // BAD: This recalculates on EVERY recomposition!
-    // Even typing in the Notes field triggers re-filtering!
-    val filteredItems = items.filter {
-        it.contains(searchQuery, ignoreCase = true)
+    // Even changing quantity triggers re-filtering!
+    val filteredItems = remember(searchQuery, quantity) {
+        // Increment once per filter call (not per item)
+        filterCallCount++
+        Log.d("DerivedState", "Filter called! Count: $filterCallCount")
+        items.filter { it.contains(searchQuery, ignoreCase = true) }
     }
-
-    Log.d("DerivedState", "Filter called! Recompose count: ${recomposeCount.count}")
 
     LazyColumn(
         modifier = modifier
@@ -95,6 +95,40 @@ fun DerivedStateMisuseBroken(
             )
         }
 
+        // Instructions FIRST
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Try This",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = BadColor
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = """
+1. Tap + or - to change quantity
+2. Watch "Filter ran X times" increase!
+
+The search didn't change, but filter runs anyway. That's wasted work!
+                        """.trimIndent(),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
+        // Interactive demo
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -107,110 +141,63 @@ fun DerivedStateMisuseBroken(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Shopping List with Notes",
+                        text = "Grocery List",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
-
-                    val focusManager = LocalFocusManager.current
 
                     // Search field
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        label = { Text("Search items") },
+                        label = { Text("Search groceries") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(
-                            onNext = { focusManager.clearFocus() }
-                        )
+                        singleLine = true
                     )
 
-                    // Unrelated notes field - typing here should NOT re-filter!
-                    OutlinedTextField(
-                        value = notes,
-                        onValueChange = { notes = it },
-                        label = { Text("Notes (type here to see the bug)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        maxLines = 3,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(
-                            onDone = { focusManager.clearFocus() }
-                        )
-                    )
-
+                    // Show filtered items
                     Text(
-                        text = "Found ${filteredItems.size} of ${items.size} items",
-                        style = MaterialTheme.typography.bodyLarge
+                        text = "Results: ${filteredItems.joinToString(", ").ifEmpty { "(no matches)" }}",
+                        style = MaterialTheme.typography.bodyMedium
                     )
+
+                    // Quantity selector - unrelated to search!
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Quantity: $quantity",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { if (quantity > 1) quantity-- }) {
+                                Text("-")
+                            }
+                            Button(onClick = { quantity++ }) {
+                                Text("+")
+                            }
+                        }
+                    }
 
                     // This is the key metric!
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = BadColor.copy(alpha = 0.2f)
+                            containerColor = BadColor.copy(alpha = 0.3f)
                         )
                     ) {
                         Column(
                             modifier = Modifier.padding(12.dp)
                         ) {
                             Text(
-                                text = "Recompositions: ${recomposeCount.count}",
-                                style = MaterialTheme.typography.titleMedium,
+                                text = "Filter ran $filterCallCount times",
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = BadColor
                             )
-                            Text(
-                                text = "Filter runs every recomposition!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = BadColor
-                            )
-                            Text(
-                                text = "Notes length: ${notes.length} chars",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
                         }
                     }
-                }
-            }
-        }
-
-        // Bug Explanation
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "The Bug",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = BadColor
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = """
-Type anything in the "Notes" field.
-
-Watch the filter count increase with every keystroke!
-
-The search query didn't change, but the filter runs anyway because:
-• notes changed → recomposition triggered
-• filter is computed inline → runs every recomposition
-• 100 items filtered on every keystroke = lag
-
-With 1000+ items, typing would feel sluggish.
-                        """.trimIndent(),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
                 }
             }
         }

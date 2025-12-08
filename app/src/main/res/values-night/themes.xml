@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ComposePatternsPlayground" parent="android:Theme.Material.NoActionBar">
+        <!-- Splash screen background color for dark mode -->
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+
+    <!-- Dark mode splash background -->
+    <color name="splash_background">#FF121212</color>
+</resources>
