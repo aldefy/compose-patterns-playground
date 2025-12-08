@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -72,6 +74,7 @@ fun StateInLoopBroken(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
 
@@ -81,6 +84,33 @@ fun StateInLoopBroken(
             fontWeight = FontWeight.Bold,
             color = BadColor
         )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Instructions
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Try This",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BadColor
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "1. Check the first 2 checkboxes\n" +
+                        "2. Tap \"Add at Start\" to add a new task\n" +
+                        "3. Watch the checkmarks \"jump\" to wrong items!\n\n" +
+                        "The state stayed at position 0 & 1, but the items shifted.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -101,11 +131,6 @@ fun StateInLoopBroken(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
-            text = "Check some boxes, then add/remove items!",
-            style = MaterialTheme.typography.labelSmall,
-            color = BadColor
-        )
 
         Card(
             modifier = Modifier.fillMaxWidth(),
