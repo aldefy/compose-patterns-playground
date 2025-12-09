@@ -48,11 +48,9 @@ import kotlinx.coroutines.delay
 // - They have a predictable lifecycle
 // ============================================================================
 
-// Proper analytics tracker with debouncing support
+// Proper analytics tracker
 object ProperAnalyticsTracker {
     var searchEventCount = 0
-        private set
-    var viewedProductIds = mutableSetOf<Int>()
         private set
 
     fun trackSearch(query: String) {
@@ -60,16 +58,8 @@ object ProperAnalyticsTracker {
         Log.d("Analytics", "Search tracked: '$query' (total: $searchEventCount)")
     }
 
-    fun trackProductView(productId: Int) {
-        if (productId !in viewedProductIds) {
-            viewedProductIds.add(productId)
-            Log.d("Analytics", "Product $productId viewed (unique: ${viewedProductIds.size})")
-        }
-    }
-
     fun reset() {
         searchEventCount = 0
-        viewedProductIds.clear()
     }
 }
 
@@ -81,6 +71,8 @@ fun SideEffectInCompositionFixed(
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var displayedCount by remember { mutableStateOf(0) }
+
     val filteredProducts = remember(searchQuery) {
         sampleProducts.filter { it.name.contains(searchQuery, ignoreCase = true) }
     }
@@ -91,6 +83,7 @@ fun SideEffectInCompositionFixed(
         if (searchQuery.isNotEmpty()) {
             delay(500) // Debounce - wait for user to stop typing
             ProperAnalyticsTracker.trackSearch(searchQuery)
+            displayedCount = ProperAnalyticsTracker.searchEventCount
         }
     }
 
@@ -99,72 +92,7 @@ fun SideEffectInCompositionFixed(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-
-        Text(
-            text = "Product Search (Fixed)",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = GoodColor
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Instructions card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = GoodColor.copy(alpha = 0.15f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "Try This",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = GoodColor
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "1. Type \"watch\" in the search box below\n" +
-                        "2. Wait half a second after typing\n" +
-                        "3. Only ONE search event tracked!\n\n" +
-                        "LaunchedEffect + debounce = proper analytics.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Analytics display
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = GoodColor.copy(alpha = 0.1f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "Search events tracked: ${ProperAnalyticsTracker.searchEventCount}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = GoodColor
-                )
-                Text(
-                    text = "1 event per search (debounced 500ms)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GoodColor
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Unique products viewed: ${ProperAnalyticsTracker.viewedProductIds.size}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
+        // Search field at TOP - stays visible with keyboard
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -174,44 +102,125 @@ fun SideEffectInCompositionFixed(
             singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Product list
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        // Analytics counter - visible while typing
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = GoodColor.copy(alpha = 0.1f)
+            )
         ) {
-            items(filteredProducts, key = { it.id }) { product ->
-                // GOOD: Track in LaunchedEffect, only once per product
-                LaunchedEffect(product.id) {
-                    ProperAnalyticsTracker.trackProductView(product.id)
-                }
-
-                ProductCardFixed(product)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Search events: $displayedCount",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GoodColor
+                )
+                Text(
+                    text = "Debounced 500ms",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GoodColor
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Explanation
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "Why this works",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "LaunchedEffect(searchQuery):\n" +
-                        "• Runs AFTER composition succeeds\n" +
-                        "• Cancelled if key changes (new keystroke)\n" +
-                        "• Debounce waits for user to stop typing\n\n" +
-                        "LaunchedEffect(product.id):\n" +
-                        "• Tracks each product only once\n" +
-                        "• Won't re-run on recomposition",
-                    style = MaterialTheme.typography.bodySmall
-                )
+        // Product list and other content in scrollable area
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Instructions
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = GoodColor.copy(alpha = 0.15f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Try This",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = GoodColor
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Type \"watch\" and wait 0.5s - only ONE event tracked!\n" +
+                                "LaunchedEffect + debounce = proper analytics.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            // Products
+            items(filteredProducts, key = { it.id }) { product ->
+                ProductCardFixed(product)
+            }
+
+            // The fix code
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = GoodColor.copy(alpha = 0.05f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "The Fix",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = GoodColor
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = """// GOOD: Use LaunchedEffect!
+@Composable
+fun SearchScreen() {
+    LaunchedEffect(query) {
+        delay(500) // debounce
+        Analytics.track(query) // ✓
+    }
+}""",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+
+            // Explanation at bottom
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Why this works",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "LaunchedEffect(key):\n" +
+                                "• Runs AFTER composition succeeds\n" +
+                                "• Cancelled when key changes\n" +
+                                "• Debounce waits for typing to stop\n" +
+                                "• Tracks exactly once per search!",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             }
         }
     }

@@ -51,9 +51,8 @@ import com.example.patterns.ui.theme.BadColor
 
 // Simulating analytics tracking - in real code this would be Firebase, etc.
 object AnalyticsTracker {
+    // Plain Int - not Compose state (like real Firebase SDK)
     var searchEventCount = 0
-        private set
-    var viewedProductIds = mutableListOf<Int>()
         private set
 
     fun trackSearch(query: String) {
@@ -61,14 +60,8 @@ object AnalyticsTracker {
         Log.d("Analytics", "Search tracked: '$query' (total: $searchEventCount)")
     }
 
-    fun trackProductView(productId: Int) {
-        viewedProductIds.add(productId)
-        Log.d("Analytics", "Product $productId viewed (total views: ${viewedProductIds.size})")
-    }
-
     fun reset() {
         searchEventCount = 0
-        viewedProductIds.clear()
     }
 }
 
@@ -93,14 +86,19 @@ fun SideEffectInCompositionBroken(
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
+
+    // This state is used to display the counter - updated after each tracking
+    var displayedCount by remember { mutableStateOf(0) }
+
     val filteredProducts = remember(searchQuery) {
         sampleProducts.filter { it.name.contains(searchQuery, ignoreCase = true) }
     }
 
     // BAD: Analytics tracked DURING composition!
-    // Every keystroke causes recomposition, which tracks another search event
+    // This runs on EVERY recomposition, not just when searchQuery changes
     if (searchQuery.isNotEmpty()) {
         AnalyticsTracker.trackSearch(searchQuery)
+        displayedCount = AnalyticsTracker.searchEventCount
     }
 
     Column(
@@ -108,67 +106,7 @@ fun SideEffectInCompositionBroken(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-
-        Text(
-            text = "Product Search",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = BadColor
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Instructions card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = BadColor.copy(alpha = 0.15f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "Try This",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = BadColor
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "1. Type \"watch\" in the search box below\n" +
-                        "2. Look at the \"Search events tracked\" counter\n" +
-                        "3. You typed 5 letters, but way more events tracked!\n\n" +
-                        "Each keystroke triggers recomposition → analytics runs again.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Analytics display
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = BadColor.copy(alpha = 0.1f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "Search events tracked: ${AnalyticsTracker.searchEventCount}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = BadColor
-                )
-                Text(
-                    text = "Expected: 1 per search, Actual: 1 per keystroke!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BadColor
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
+        // Search field at TOP - stays visible with keyboard
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -178,40 +116,124 @@ fun SideEffectInCompositionBroken(
             singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Product list
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        // Analytics counter - visible while typing
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = BadColor.copy(alpha = 0.1f)
+            )
         ) {
-            items(filteredProducts, key = { it.id }) { product ->
-                // BAD: Product view tracked during composition!
-                AnalyticsTracker.trackProductView(product.id)
-
-                ProductCard(product)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Search events: $displayedCount",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BadColor
+                )
+                Text(
+                    text = "Typed ${searchQuery.length} chars",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BadColor
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Explanation
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "What's wrong?",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Analytics code runs DURING composition:\n" +
-                        "• Runs on every recomposition\n" +
-                        "• 'watch' = 5 keystrokes = 5+ search events\n" +
-                        "• Product views tracked repeatedly\n\n" +
-                        "Your analytics dashboard shows 10x real usage!",
-                    style = MaterialTheme.typography.bodySmall
-                )
+        // Product list and other content in scrollable area
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Instructions
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = BadColor.copy(alpha = 0.15f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Try This",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = BadColor
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Type \"watch\" (5 letters) and watch the counter.\n" +
+                                "It may go higher than 5 due to recompositions!",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            // Products
+            items(filteredProducts, key = { it.id }) { product ->
+                ProductCard(product)
+            }
+
+            // The buggy code
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = BadColor.copy(alpha = 0.05f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "The Bug",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = BadColor
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = """// BAD: Runs during composition!
+@Composable
+fun SearchScreen() {
+    if (query.isNotEmpty()) {
+        Analytics.track(query) // ❌
+    }
+}""",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+
+            // Explanation at bottom
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "What's wrong?",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Side effects during composition:\n" +
+                                "• May run multiple times\n" +
+                                "• No guarantee of execution order\n" +
+                                "• Can be cancelled mid-way\n" +
+                                "• Real analytics over-counted!",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             }
         }
     }
