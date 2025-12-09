@@ -114,10 +114,40 @@ fun FlowCollectWrongFixed(
             }
         }
 
+        // The fix code
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = GoodColor.copy(alpha = 0.05f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "The Fix",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GoodColor
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = """// GOOD: Create flow once with remember
+val tickerFlow = remember { // ✓
+    flow { emit(count++) }
+}
+
+// GOOD: Use collectAsState!
+val tickCount by tickerFlow
+    .collectAsState(initial = 0) // ✓""",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+        }
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Why does this work?",
+                    text = "Why this works",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -125,22 +155,12 @@ fun FlowCollectWrongFixed(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = """
-                        Two fixes:
-
-                        1. Flow created with remember { }
-                           • Same flow instance across recompositions
-                           • Flow continues uninterrupted
-
-                        2. Using collectAsState()
-                           • Handles lifecycle automatically
-                           • No manual LaunchedEffect needed
-                           • Properly survives recomposition
-
-                        In production:
-                        • Create flows in ViewModel/Repository
-                        • Use collectAsStateWithLifecycle() from lifecycle-runtime-compose
-                    """.trimIndent(),
+                    text = "1. remember { flow { } }\n" +
+                        "   → Same instance across recompositions\n\n" +
+                        "2. collectAsState()\n" +
+                        "   → Handles lifecycle automatically\n" +
+                        "   → No manual LaunchedEffect needed\n\n" +
+                        "In production: use ViewModel + collectAsStateWithLifecycle()",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

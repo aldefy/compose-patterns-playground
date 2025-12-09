@@ -133,6 +133,39 @@ fun FlowCollectWrongBroken(
             }
         }
 
+        // The buggy code
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = BadColor.copy(alpha = 0.05f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "The Bug",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BadColor
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = """// BAD: Flow created inside composable!
+val tickerFlow = flow { // ❌ New each recomposition
+    emit(count++)
+}
+
+// BAD: Wrong key causes restart loop!
+LaunchedEffect(tickCount) { // ❌
+    tickerFlow.collect { value ->
+        tickCount = value // restarts effect!
+    }
+}""",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+        }
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -144,19 +177,11 @@ fun FlowCollectWrongBroken(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = """
-                        Two problems:
-
-                        1. Flow created INSIDE composable
-                           • New flow instance each recomposition
-                           • Old flow cancelled, new one starts
-                           • Counter resets to 0
-
-                        2. LaunchedEffect key is tickCount
-                           • When tickCount changes, effect restarts
-                           • Which changes tickCount...
-                           • Infinite restart loop!
-                    """.trimIndent(),
+                    text = "1. Flow created INSIDE composable\n" +
+                        "   → New instance each recomposition\n\n" +
+                        "2. LaunchedEffect(tickCount)\n" +
+                        "   → Restarts when tickCount changes\n" +
+                        "   → Which changes tickCount... loop!",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
