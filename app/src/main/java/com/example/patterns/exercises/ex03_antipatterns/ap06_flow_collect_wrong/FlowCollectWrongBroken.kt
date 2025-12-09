@@ -2,31 +2,35 @@ package com.example.patterns.exercises.ex03_antipatterns.ap06_flow_collect_wrong
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.patterns.ui.theme.BadColor
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 // ============================================================================
@@ -35,155 +39,174 @@ import kotlinx.coroutines.flow.flow
 //
 // THE BUG:
 // Collecting flows incorrectly in Compose:
-// 1. Collecting in LaunchedEffect with wrong key
-// 2. Not using collectAsState for simple state mapping
-// 3. Creating new flow on each recomposition
+// 1. Creating flow inside composable (new instance each recomposition)
+// 2. Using wrong LaunchedEffect key
 //
 // SYMPTOMS:
 // - Flow restarts on every recomposition
-// - Missing emissions
+// - Missing emissions / data resets
 // - Duplicate processing
-// - Memory leaks
 // ============================================================================
 
-// A simple ticker flow for demonstration
-fun createTickerFlow(): Flow<Int> = flow {
-    var count = 0
-    while (true) {
-        emit(count++)
-        delay(1000)
-    }
-}
+data class StockPrice(val symbol: String, val price: Double, val change: Double)
 
 /**
- * BROKEN: Creating flow inside composable and wrong LaunchedEffect usage
+ * BROKEN: Creating flow inside composable - restarts on every recomposition
  */
 @Composable
 fun FlowCollectWrongBroken(
     modifier: Modifier = Modifier
 ) {
-    var tickCount by remember { mutableStateOf(0) }
-    var unrelatedCounter by remember { mutableIntStateOf(0) }
+    var messageText by remember { mutableStateOf("") }
+    var prices by remember { mutableStateOf<List<StockPrice>>(emptyList()) }
+    var updateCount by remember { mutableStateOf(0) }
 
-    // BAD: Creating flow inside the composable!
-    // This creates a NEW flow on every recomposition
-    val tickerFlow = flow {
-        var count = 0
+    // BAD: Creating flow INSIDE the composable!
+    // Every recomposition creates a NEW flow instance
+    val stockFlow = flow {
+        var tick = 0
         while (true) {
-            emit(count++)
+            val newPrices = listOf(
+                StockPrice("AAPL", 178.0 + (tick % 10) * 0.5, (tick % 10) * 0.5),
+                StockPrice("GOOGL", 141.0 + (tick % 8) * 0.3, (tick % 8) * 0.3),
+                StockPrice("MSFT", 378.0 + (tick % 12) * 0.4, (tick % 12) * 0.4),
+            )
+            emit(newPrices)
+            tick++
             delay(1000)
         }
     }
 
-    // BAD: Using the flow value as a key
-    // This restarts collection every time tickCount changes!
-    LaunchedEffect(tickCount) {
-        tickerFlow.collect { value ->
-            tickCount = value
+    // BAD: This collects a NEW flow each time messageText changes!
+    LaunchedEffect(messageText) {
+        stockFlow.collect { newPrices ->
+            prices = newPrices
+            updateCount++
         }
     }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(16.dp)
     ) {
-
-        Text(
-            text = "Wrong Flow Collection",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = BadColor
+        // Text field at TOP - stays visible with keyboard
+        OutlinedTextField(
+            value = messageText,
+            onValueChange = { messageText = it },
+            label = { Text("Type here to break the flow") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            trailingIcon = {
+                IconButton(onClick = { messageText = "" }) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Clear")
+                }
+            }
         )
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Stock prices display - key info visible with keyboard
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = BadColor.copy(alpha = 0.1f)
             )
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Tick Count: $tickCount",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Updates: $updateCount",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = BadColor
+                    )
+                    Text(
+                        text = "Resets on typing!",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = BadColor
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Notice: Counter keeps resetting!",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = BadColor
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(onClick = { unrelatedCounter++ }) {
-                    Text("Trigger Recomposition ($unrelatedCounter)")
+                prices.forEach { stock ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(stock.symbol, fontWeight = FontWeight.Bold)
+                        Text("$${String.format("%.2f", stock.price)}")
+                        Text("+${String.format("%.2f", stock.change)}", color = BadColor)
+                    }
                 }
 
-                Text(
-                    text = "Clicking creates a NEW flow each time!",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = BadColor
-                )
+                if (prices.isEmpty()) {
+                    Text("Loading...", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
 
-        // The buggy code
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = BadColor.copy(alpha = 0.05f)
-            )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Scrollable content below
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "The Bug",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = BadColor
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = """// BAD: Flow created inside composable!
-val tickerFlow = flow { // ❌ New each recomposition
-    emit(count++)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = BadColor.copy(alpha = 0.15f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Try This",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = BadColor
+                        )
+                        Text(
+                            text = "Watch prices update, then type above.\n" +
+                                "Updates counter resets with each keystroke!",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = BadColor.copy(alpha = 0.05f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "The Bug",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = BadColor
+                        )
+                        Text(
+                            text = """// BAD: Flow created inside composable!
+val stockFlow = flow { // ❌ NEW instance
+    emit(prices)
 }
 
-// BAD: Wrong key causes restart loop!
-LaunchedEffect(tickCount) { // ❌
-    tickerFlow.collect { value ->
-        tickCount = value // restarts effect!
-    }
+LaunchedEffect(messageText) { // ❌
+    stockFlow.collect { ... }
 }""",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-            }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "What's wrong?",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "1. Flow created INSIDE composable\n" +
-                        "   → New instance each recomposition\n\n" +
-                        "2. LaunchedEffect(tickCount)\n" +
-                        "   → Restarts when tickCount changes\n" +
-                        "   → Which changes tickCount... loop!",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+                }
             }
         }
     }
