@@ -15,12 +15,16 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.patterns.ui.theme.BadColor
@@ -49,7 +53,7 @@ fun SharedStateMutationBroken(
 ) {
     // BAD: Using MutableList - mutations won't trigger recomposition!
     var items by remember { mutableStateOf(mutableListOf("Item 1", "Item 2", "Item 3")) }
-    var counter by remember { mutableStateOf(0) }
+    var counter by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = modifier
@@ -74,13 +78,16 @@ fun SharedStateMutationBroken(
             )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Items (${items.size}):",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                // Force this section to recompose when counter changes
+                key(counter) {
+                    Text(
+                        text = "Items (${items.size}):",
+                        style = MaterialTheme.typography.titleMedium
+                    )
 
-                items.forEach { item ->
-                    Text(text = "• $item")
+                    items.forEach { item ->
+                        Text(text = "• $item")
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -89,7 +96,7 @@ fun SharedStateMutationBroken(
                     Button(onClick = {
                         // BAD: Mutating the same list object
                         items.add("Item ${items.size + 1}")
-                        // UI won't update because 'items' reference hasn't changed!
+                        Log.d("AP09", "Add clicked, items.size=${items.size}")
                     }) {
                         Text("Add Item (Broken)")
                     }
@@ -107,7 +114,10 @@ fun SharedStateMutationBroken(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // This button forces recomposition
-                Button(onClick = { counter++ }) {
+                Button(onClick = {
+                    counter++
+                    Log.d("AP09", "Force clicked, counter=$counter, items.size=${items.size}")
+                }) {
                     Text("Force Recomposition ($counter)")
                 }
 
@@ -115,6 +125,40 @@ fun SharedStateMutationBroken(
                     text = "Click Add, then Force Recomposition to see items!",
                     style = MaterialTheme.typography.labelSmall,
                     color = BadColor
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = BadColor.copy(alpha = 0.05f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "The Bug",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BadColor
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = """// BAD: MutableList in state
+var items by remember {
+    mutableStateOf(mutableListOf("A", "B"))
+}
+
+Button(onClick = {
+    items.add("C")  // ❌ Mutates same object
+    // Reference unchanged = no recomposition!
+})""",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
             }
         }
