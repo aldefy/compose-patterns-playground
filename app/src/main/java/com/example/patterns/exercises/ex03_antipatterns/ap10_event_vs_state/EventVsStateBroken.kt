@@ -2,6 +2,7 @@ package com.example.patterns.exercises.ex03_antipatterns.ap10_event_vs_state
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,14 +32,16 @@ import com.example.patterns.ui.theme.BadColor
 // ============================================================================
 //
 // THE BUG:
-// Using state to represent one-time events. This leads to:
-// - Events being processed multiple times
-// - Needing to manually "reset" state after handling
-// - Race conditions
+// Using state to represent one-time events. StateFlow/State retains the last
+// value, so if recomposition happens while the "event" state is still set,
+// the event gets re-handled.
+//
+// Reference: Manuel Vivo (Google) - "ViewModel Events" anti-pattern
+// https://medium.com/androiddevelopers/viewmodel-one-off-event-antipatterns-16a1da869b95
 //
 // SYMPTOMS:
 // - Snackbar shown multiple times for same error
-// - Navigation triggered repeatedly
+// - Navigation triggered repeatedly on config change
 // - "Already handled" bugs
 // ============================================================================
 
@@ -50,20 +53,16 @@ fun EventVsStateBroken(
     modifier: Modifier = Modifier
 ) {
     // BAD: Using state for a one-time event
-    var showError by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var clickCount by remember { mutableIntStateOf(0) }
+    var errorEvent by remember { mutableStateOf<String?>(null) }
+    var recomposeCounter by remember { mutableIntStateOf(0) }
     var handledCount by remember { mutableIntStateOf(0) }
 
-    // BAD: This runs EVERY time showError is true during recomposition
-    // If something else causes recomposition, the error shows again!
-    LaunchedEffect(showError) {
-        if (showError) {
+    // BAD: This pattern re-handles the event every time recomposeCounter changes!
+    // The errorEvent state persists, so checking it again triggers duplicate handling.
+    LaunchedEffect(recomposeCounter) {
+        if (errorEvent != null) {
             handledCount++
-            // "Handle" the error
-            kotlinx.coroutines.delay(100)
-            // Oops, we need to manually reset!
-            // But what if recomposition happens before we reset?
+            // Simulates "handling" the error (e.g., showing snackbar)
         }
     }
 
@@ -73,9 +72,8 @@ fun EventVsStateBroken(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-
         Text(
-            text = "Events as State",
+            text = "Event as State Bug",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = BadColor
@@ -90,43 +88,82 @@ fun EventVsStateBroken(
             )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Click count: $clickCount")
-                Text("Event handled: $handledCount times")
+                Text(
+                    text = "Event handled: $handledCount times",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (handledCount > 1) BadColor else MaterialTheme.colorScheme.onSurface
+                )
 
-                if (showError) {
+                if (errorEvent != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = errorMessage ?: "Error!",
-                        color = MaterialTheme.colorScheme.error,
+                        text = errorEvent!!,
+                        color = BadColor,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Button(onClick = {
-                    clickCount++
-                    showError = true
-                    errorMessage = "Error #$clickCount"
-                }) {
-                    Text("Trigger Error")
-                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        errorEvent = "Save failed!"
+                    }) {
+                        Text("Trigger Error")
+                    }
 
-                Button(onClick = {
-                    showError = false
-                    errorMessage = null
-                }) {
-                    Text("Clear Error (Manual Reset)")
+                    Button(onClick = {
+                        recomposeCounter++
+                    }) {
+                        Text("Recompose ($recomposeCounter)")
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Problems:\n" +
-                            "• Must manually reset state\n" +
-                            "• Can be handled multiple times\n" +
-                            "• Survives configuration changes (may re-show)",
+                    text = "1. Click 'Trigger Error' → handled once\n" +
+                            "2. Click 'Recompose' → handled AGAIN! (bug)",
                     style = MaterialTheme.typography.labelSmall,
                     color = BadColor
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = BadColor.copy(alpha = 0.05f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "The Bug",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BadColor
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = """// BAD: State for one-time event
+var errorEvent by remember {
+    mutableStateOf<String?>(null)
+}
+
+// Re-triggers on every state read!
+snapshotFlow { errorEvent }
+    .collect { error ->
+        if (error != null) {
+            showSnackbar(error) // ❌ Shows again!
+        }
+    }""",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
             }
         }
@@ -136,7 +173,7 @@ fun EventVsStateBroken(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "What's wrong?",
+                    text = "Why it happens",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -144,18 +181,15 @@ fun EventVsStateBroken(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = """
-                        State is WHAT THE UI IS.
-                        Events are WHAT HAPPENED.
+                    text = """State persists its value. When recomposition happens:
 
-                        "An error should be shown" = State ✓
-                        "An error just occurred" = Event ✗
+• errorEvent is still "Save failed!"
+• snapshotFlow emits again
+• Handler runs again → duplicate snackbar!
 
-                        Using state for events causes:
-                        • Re-triggering on recomposition
-                        • Manual reset needed
-                        • Race conditions during reset
-                    """.trimIndent(),
+Same bug occurs on:
+• Screen rotation (config change)
+• Any state change causing recomposition""",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
