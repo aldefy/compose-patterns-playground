@@ -256,6 +256,44 @@ fun EffectsInTransitionFixed(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = GoodColor.copy(alpha = 0.05f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "The Fix",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GoodColor
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = """// GOOD: Pure transition function
+fun transition(
+    state: State,
+    event: Event
+): TransitionResult<State, Effect> {
+    return TransitionResult(
+        newState = Loading,
+        effects = listOf(  // ✓ Effects as DATA
+            Effect.FetchApi,
+            Effect.TrackAnalytics
+        )
+    )
+}""",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -267,21 +305,16 @@ fun EffectsInTransitionFixed(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = """
-                        pageTransition() is PURE:
-                        • No side effects
-                        • Same input → same output
-                        • Returns effects as DATA
+                    text = """transition() is PURE:
+• No side effects
+• Same input → same output
+• Returns effects as DATA
 
-                        Benefits:
-                        1. Easy to test (no mocking!)
-                        2. Can inspect effects before execution
-                        3. Can retry specific effects
-                        4. Can order effects differently
-                        5. Clear separation of concerns
-
-                        This is the TransitionResult pattern!
-                    """.trimIndent(),
+Benefits:
+• Easy to test (no mocking!)
+• Can inspect effects before execution
+• Can retry specific effects
+• Clear separation of concerns""",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

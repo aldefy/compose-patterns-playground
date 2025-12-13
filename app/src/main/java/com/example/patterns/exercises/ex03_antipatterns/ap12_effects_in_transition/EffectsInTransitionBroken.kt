@@ -165,6 +165,42 @@ fun EffectsInTransitionBroken(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = BadColor.copy(alpha = 0.05f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "The Bug",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BadColor
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = """// BAD: Impure transition function
+suspend fun load() {
+    state = Loading
+
+    // ❌ Side effects in transition!
+    api.fetchData()      // Network
+    analytics.track()    // Analytics
+    Log.d("tag", "...")  // Logging
+
+    state = Loaded(data)
+}""",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -176,21 +212,16 @@ fun EffectsInTransitionBroken(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = """
-                        The load() function is IMPURE:
-                        • Executes network calls
-                        • Tracks analytics
-                        • Logs to console
+                    text = """The load() function is IMPURE - it executes
+side effects directly!
 
-                        Problems:
-                        1. Can't test without mocking
-                        2. Can't inspect what effects will run
-                        3. Can't retry individual effects
-                        4. Hard to debug ordering issues
-                        5. Can't rollback on failure
+Problems:
+• Can't test without mocking
+• Can't inspect what effects will run
+• Can't retry individual effects
+• Hard to debug ordering issues
 
-                        SOLUTION: Return effects as DATA
-                    """.trimIndent(),
+SOLUTION: Return effects as DATA""",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
